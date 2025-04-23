@@ -1,6 +1,3 @@
-/* Tailwind responsive optimizations */
-/* Added utility classes to ensure full usability on small screens */
-
 import React, { useState, useEffect, createContext, useContext, useRef } from "react";
 import {
   DndContext,
@@ -11,9 +8,9 @@ import {
 } from "@dnd-kit/core";
 import { createClient } from "@supabase/supabase-js";
 
-
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
+
 const SupabaseContext = createContext(null);
 
 function SupabaseProvider({ children }) {
@@ -99,111 +96,101 @@ function TeamLayout() {
   };
 
   useEffect(() => {
-    async function fetchLayouts() {
+    const channel = supabase.channel("team-selector-sync");
+    channel.on("broadcast", { event: "drag" }, ({ payload }) => {
+      const action = payload;
+      if (action.type === "RETURN") {
+        setPlayers((prev) => [...prev, action.player]);
+        setField((prev) => prev.map(row => row.map(p => (p?.id === action.id ? null : p))));
+      } else if (action.type === "MOVE") {
+        setPlayers((prev) => prev.filter(p => p.id !== action.id));
+        setField((prev) => {
+          const updated = prev.map(row => row.map(p => (p?.id === action.id ? null : p)));
+          updated[action.row][action.col] = action.player;
+          return updated;
+        });
+      }
+    });
+    channel.subscribe();
+
+    const fetchLayouts = async () => {
       const { data, error } = await supabase.from('layouts').select('name');
       if (!error && data) setSavedLayouts(data.map(d => d.name));
-    }
+    };
+
     fetchLayouts();
   }, []);
 
   return (
     <div className="flex flex-col gap-4 px-2 py-4 w-full max-w-screen-sm mx-auto">
-      <div className="flex flex-wrap justify-center items-center gap-2">
-        <input
-          ref={layoutNameRef}
-          type="text"
-          placeholder="Layout name"
-          list="layout-options"
-          className="border px-2 py-1 text-sm rounded w-40"
-        />
-        <datalist id="layout-options">
-          {savedLayouts.map((name) => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
-        <button
-          className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 text-sm rounded"
-          onClick={async () => {
-            const name = layoutNameRef.current?.value?.trim();
-            if (!name) return alert("Please enter a layout name.");
-            const payload = JSON.stringify(field);
-            const { data: existing, error: checkError } = await supabase.from('layouts').select('name').eq('name', name);
-            if (checkError) return console.error('Check error:', checkError);
-            if (existing.length > 0) {
-              const confirmUpdate = confirm("A layout with this name already exists. Do you want to update it?");
-              if (!confirmUpdate) return;
-              const { error: updateError } = await supabase.from('layouts').update({ data: payload }).eq('name', name);
-              if (updateError) console.error('Update error:', updateError);
-              else console.log('Layout updated:', name);
-              return;
-            }
-            const { error: insertError } = await supabase.from('layouts').insert({ name, data: payload });
-            if (insertError) console.error('Save error:', insertError);
-            else console.log('Layout saved:', name);
-          }}
-        >
-          Save
-        </button>
-        <button
-          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-sm rounded"
-          onClick={async () => {
-            const name = layoutNameRef.current?.value?.trim();
-            if (!name) return alert("Please enter a layout name.");
-            const { data, error } = await supabase.from('layouts').select('data').eq('name', name).limit(1);
-            if (error) console.error('Load error:', error);
-            else if (data.length > 0) {
-              try {
-                setField(JSON.parse(data[0].data));
-                console.log("Layout loaded:", name);
-              } catch (e) {
-                console.error('Parse error:', e);
-              }
-            }
-          }}
-        >
-          Load
-        </button>
-      </div>
-
       <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-        <div className="flex flex-col sm:flex-row justify-center items-start gap-4">
-          <ListDropZone
-            players={players}
-            onDoubleClick={handleDoubleClick}
-            isEditing={editingId}
-            onChange={handleNameChange}
-            onBlur={handleBlur}
-          />
+        <div className="grid grid-cols-3 gap-2" style={{ rowGap: '0.5rem' }}>
+          {field.map((_, rowIndex) => (
+            <React.Fragment key={rowIndex}>
+              {field[rowIndex].map((player, colIndex) => (
+                <DropZone
+                  key={`${rowIndex}-${colIndex}`}
+                  id={`${rowIndex}-${colIndex}`}
+                  player={player}
+                  onDoubleClick={handleDoubleClick}
+                  isEditing={editingId === player?.id}
+                  onChange={handleNameChange}
+                  onBlur={handleBlur}
+                >
+                  {rowIndex === 0 && colIndex === 1 && !player && (<span className="text-sm font-bold">FB</span>)}
+                  {rowIndex === 1 && colIndex === 1 && !player && (<span className="text-sm font-bold">HB</span>)}
+                  {rowIndex === 2 && colIndex === 1 && !player && (<span className="text-sm font-bold">C</span>)}
+                  {rowIndex === 3 && colIndex === 1 && !player && (<span className="text-sm font-bold">HF</span>)}
+                  {rowIndex === 4 && colIndex === 1 && !player && (<span className="text-sm font-bold">FF</span>)}
+                  {rowIndex === 5 && colIndex === 1 && !player && (<span className="text-sm font-bold">FOL</span>)}
+                </DropZone>
+              ))}
+            </React.Fragment>
+          ))}
+        </div>
 
-          <div className="grid grid-cols-3 gap-2" style={{ rowGap: '0.5rem' }}>
-            {field.map((_, rowIndex) => (
-              <React.Fragment key={rowIndex}>
-                {field[rowIndex].map((player, colIndex) => (
-                  <DropZone
-                    key={`${rowIndex}-${colIndex}`}
-                    id={`${rowIndex}-${colIndex}`}
-                    player={player}
-                    onDoubleClick={handleDoubleClick}
-                    isEditing={editingId === player?.id}
-                    onChange={handleNameChange}
-                    onBlur={handleBlur}
-                  >
-                    {rowIndex === 0 && colIndex === 1 && !player && <span className="text-xs font-bold">FB</span>}
-                    {rowIndex === 1 && colIndex === 1 && !player && <span className="text-xs font-bold">HB</span>}
-                    {rowIndex === 2 && colIndex === 1 && !player && <span className="text-xs font-bold">C</span>}
-                    {rowIndex === 3 && colIndex === 1 && !player && <span className="text-xs font-bold">HF</span>}
-                    {rowIndex === 4 && colIndex === 1 && !player && <span className="text-xs font-bold">FF</span>}
-                    {rowIndex === 5 && colIndex === 1 && !player && <span className="text-xs font-bold">FOL</span>}
-                  </DropZone>
-                ))}
-              </React.Fragment>
-            ))}
+        <div className="overflow-x-auto mt-4">
+          <div className="flex flex-row gap-2 py-2">
+            <ListDropZone
+              players={players}
+              onDoubleClick={handleDoubleClick}
+              isEditing={editingId}
+              onChange={handleNameChange}
+              onBlur={handleBlur}
+            />
           </div>
         </div>
+
         <DragOverlay>
           {activePlayer ? <PlayerCard player={activePlayer} editable={false} /> : null}
         </DragOverlay>
       </DndContext>
+    </div>
+  );
+}
+
+function DropZone({ id, player, children, ...rest }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`h-12 w-28 rounded flex items-center justify-center ${id.split('-')[0] >= 6 ? 'bg-yellow-100' : 'bg-red-200'} ${isOver ? "ring-2 ring-blue-400" : ""}`}
+    >
+      {player ? <PlayerCard player={player} editable={false} {...rest} /> : children}
+    </div>
+  );
+}
+
+function ListDropZone({ players, ...rest }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "player-list" });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex flex-row gap-2 overflow-x-auto py-2 ${isOver ? "ring-2 ring-blue-400" : ""}`}
+    >
+      {players.map((player) => (
+        <PlayerCard key={player.id} player={player} {...rest} editable={true} />
+      ))}
     </div>
   );
 }
@@ -220,8 +207,9 @@ function PlayerCard({ player, onDoubleClick, isEditing, onChange, onBlur, editab
         e.stopPropagation();
         if (editable && !isDragging) onDoubleClick(player.id);
       }}
-      className={`bg-blue-200 p-2 rounded text-center text-xs font-bold h-12 w-24 flex flex-col justify-center items-center ${isDragging ? "opacity-50" : ""}`}
-      style={{ transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined }}
+      className={`bg-blue-200 p-2 rounded text-center text-xs font-bold h-12 w-24 flex flex-col justify-center items-center touch-none ${isDragging ? "opacity-50" : ""}`}
+style={{ transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined }}
+
     >
       {editable && isEditing ? (
         <input
@@ -240,63 +228,29 @@ function PlayerCard({ player, onDoubleClick, isEditing, onChange, onBlur, editab
   );
 }
 
-function DropZone({ id, player, children, ...rest }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  return (
-    <div
-      ref={setNodeRef}
-      className={`h-12 w-24 rounded flex items-center justify-center ${id.split('-')[0] >= 6 ? 'bg-yellow-100' : 'bg-red-200'} ${isOver ? "ring-2 ring-blue-400" : ""}`}
-    >
-      {player ? <PlayerCard player={player} editable={false} {...rest} /> : children}
-    </div>
-  );
-}
-
-function ListDropZone({ players, ...rest }) {
-  const { setNodeRef, isOver } = useDroppable({ id: "player-list" });
-  return (
-    <div
-      ref={setNodeRef}
-      className={`flex flex-col gap-2 max-h-[70vh] overflow-y-auto pr-2 w-full sm:w-32 ${isOver ? "ring-2 ring-blue-400" : ""}`}
-    >
-      {players.map((player) => (
-        <PlayerCard key={player.id} player={player} {...rest} editable={true} />
-      ))}
-    </div>
-  );
-}
-
 const initialPlayers = [
-  { id: "1", number: 1, name: "KULIBABA" },
-  { id: "3", number: 3, name: "WILD" },
-  { id: "6", number: 6, name: "SAWYERS" },
-  { id: "9", number: 9, name: "JOHNSTONE" },
-  { id: "14", number: 14, name: "BUCHMASSER" },
-  { id: "15", number: 15, name: "POGGENPOEL" },
-  { id: "18", number: 18, name: "PORTER" },
-  { id: "21", number: 21, name: "MARTIN" },
-  { id: "23", number: 23, name: "BANDERA" },
-  { id: "27", number: 27, name: "NELSON" },
-  { id: "30", number: 30, name: "BLAKE" },
-  { id: "31", number: 31, name: "WILLIAMS" },
-  { id: "33", number: 33, name: "BAKER" },
-  { id: "36", number: 36, name: "REED" },
-  { id: "38", number: 38, name: "JONES" },
-  { id: "39", number: 39, name: "MOSS" },
-  { id: "42", number: 42, name: "SMITH" },
-  { id: "47", number: 47, name: "BROOKS" },
-  { id: "48", number: 48, name: "TURNER" },
-  { id: "56", number: 56, name: "ADAMS" },
-  { id: "59", number: 59, name: "DAVIS" },
-  { id: "60", number: 60, name: "MURPHY" },
-  { id: "65", number: 65, name: "THOMAS" },
-  { id: "66", number: 66, name: "EVANS" },
-  { id: "73", number: 73, name: "HOWARD" },
-  { id: "74", number: 74, name: "WALKER" },
-  { id: "77", number: 77, name: "COOPER" },
-  { id: "84", number: 84, name: "JACKSON" },
-  { id: "87", number: 87, name: "LEE" },
-  { id: "92", number: 92, name: "CLARKE" }
+  { id: '6', number: 6, name: 'JENNY' },
+  { id: '33', number: 33, name: 'MOLLY' },
+  { id: '14', number: 14, name: 'IZZY' },
+  { id: '9', number: 9, name: 'INDI' },
+  { id: '3', number: 3, name: 'HARPER' },
+  { id: '1', number: 1, name: 'AMELIA' },
+  { id: '23', number: 23, name: 'SIENNA B' },
+  { id: '18', number: 18, name: 'SARAH' },
+  { id: '10', number: 10, name: 'AMBRIE' },
+  { id: '8', number: 8, name: 'LIV' },
+  { id: '15', number: 15, name: 'BRIANNA' },
+  { id: '12', number: 12, name: 'ELLA' },
+  { id: '16', number: 16, name: 'ROMY' },
+  { id: '5', number: 5, name: 'CHLOE' },
+  { id: '11', number: 11, name: 'TASIA' },
+  { id: '25', number: 25, name: 'MADDIE' },
+  { id: '2', number: 2, name: 'RUBY' },
+  { id: '4', number: 4, name: 'CHARLOTTE' },
+  { id: '13', number: 13, name: 'CHELSEA' },
+  { id: '15', number: 15, name: 'TYLAH' },
+  { id: '7', number: 7, name: 'ELLIE' },
+  { id: '38', number: 38, name: 'SIENNA R' }
 ];
 
 export default App;
