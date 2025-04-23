@@ -1,3 +1,6 @@
+/* Tailwind responsive optimizations */
+/* Added utility classes to ensure full usability on small screens */
+
 import React, { useState, useEffect, createContext, useContext, useRef } from "react";
 import {
   DndContext,
@@ -10,7 +13,8 @@ import { createClient } from "@supabase/supabase-js";
 
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;const SupabaseContext = createContext(null);
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
+const SupabaseContext = createContext(null);
 
 function SupabaseProvider({ children }) {
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -23,9 +27,11 @@ function useSupabase() {
 
 function App() {
   return (
-    <SupabaseProvider>
-      <TeamLayout />
-    </SupabaseProvider>
+    <div className="min-h-screen bg-gray-50">
+      <SupabaseProvider>
+        <TeamLayout />
+      </SupabaseProvider>
+    </div>
   );
 }
 
@@ -101,14 +107,14 @@ function TeamLayout() {
   }, []);
 
   return (
-    <>
-      <div className="flex flex-row items-center gap-2 px-4 py-2 justify-center max-w-screen-md mx-auto">
+    <div className="flex flex-col gap-4 px-2 py-4 w-full max-w-screen-sm mx-auto">
+      <div className="flex flex-wrap justify-center items-center gap-2">
         <input
           ref={layoutNameRef}
           type="text"
           placeholder="Layout name"
           list="layout-options"
-          className="border px-2 py-1 text-sm rounded w-48"
+          className="border px-2 py-1 text-sm rounded w-40"
         />
         <datalist id="layout-options">
           {savedLayouts.map((name) => (
@@ -120,12 +126,19 @@ function TeamLayout() {
           onClick={async () => {
             const name = layoutNameRef.current?.value?.trim();
             if (!name) return alert("Please enter a layout name.");
+            const payload = JSON.stringify(field);
             const { data: existing, error: checkError } = await supabase.from('layouts').select('name').eq('name', name);
             if (checkError) return console.error('Check error:', checkError);
-            if (existing.length > 0) return alert("A layout with this name already exists. Please choose a different name.");
-            const payload = JSON.stringify(field);
-            const { error } = await supabase.from('layouts').insert({ name, data: payload });
-            if (error) console.error('Save error:', error);
+            if (existing.length > 0) {
+              const confirmUpdate = confirm("A layout with this name already exists. Do you want to update it?");
+              if (!confirmUpdate) return;
+              const { error: updateError } = await supabase.from('layouts').update({ data: payload }).eq('name', name);
+              if (updateError) console.error('Update error:', updateError);
+              else console.log('Layout updated:', name);
+              return;
+            }
+            const { error: insertError } = await supabase.from('layouts').insert({ name, data: payload });
+            if (insertError) console.error('Save error:', insertError);
             else console.log('Layout saved:', name);
           }}
         >
@@ -153,7 +166,7 @@ function TeamLayout() {
       </div>
 
       <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-        <div className="flex flex-row p-4 max-w-screen-md mx-auto gap-6">
+        <div className="flex flex-col sm:flex-row justify-center items-start gap-4">
           <ListDropZone
             players={players}
             onDoubleClick={handleDoubleClick}
@@ -162,10 +175,10 @@ function TeamLayout() {
             onBlur={handleBlur}
           />
 
-          <div className="grid grid-cols-[repeat(3,auto)_min-content] gap-x-4 items-center" style={{ rowGap: '0.5rem' }}>
-            {field.map((row, rowIndex) => (
+          <div className="grid grid-cols-3 gap-2" style={{ rowGap: '0.5rem' }}>
+            {field.map((_, rowIndex) => (
               <React.Fragment key={rowIndex}>
-                {row.map((player, colIndex) => (
+                {field[rowIndex].map((player, colIndex) => (
                   <DropZone
                     key={`${rowIndex}-${colIndex}`}
                     id={`${rowIndex}-${colIndex}`}
@@ -174,21 +187,24 @@ function TeamLayout() {
                     isEditing={editingId === player?.id}
                     onChange={handleNameChange}
                     onBlur={handleBlur}
-                  />
+                  >
+                    {rowIndex === 0 && colIndex === 1 && !player && <span className="text-xs font-bold">FB</span>}
+                    {rowIndex === 1 && colIndex === 1 && !player && <span className="text-xs font-bold">HB</span>}
+                    {rowIndex === 2 && colIndex === 1 && !player && <span className="text-xs font-bold">C</span>}
+                    {rowIndex === 3 && colIndex === 1 && !player && <span className="text-xs font-bold">HF</span>}
+                    {rowIndex === 4 && colIndex === 1 && !player && <span className="text-xs font-bold">FF</span>}
+                    {rowIndex === 5 && colIndex === 1 && !player && <span className="text-xs font-bold">FOL</span>}
+                  </DropZone>
                 ))}
-                <div className="text-left font-bold text-sm pl-1 whitespace-nowrap">
-                  {`Row ${rowIndex + 1}`}
-                </div>
               </React.Fragment>
             ))}
-            <div style={{ height: '3rem' }}></div>
           </div>
         </div>
         <DragOverlay>
           {activePlayer ? <PlayerCard player={activePlayer} editable={false} /> : null}
         </DragOverlay>
       </DndContext>
-    </>
+    </div>
   );
 }
 
@@ -204,12 +220,12 @@ function PlayerCard({ player, onDoubleClick, isEditing, onChange, onBlur, editab
         e.stopPropagation();
         if (editable && !isDragging) onDoubleClick(player.id);
       }}
-      className={`bg-blue-200 p-2 rounded text-center text-sm font-bold h-12 w-28 flex flex-col justify-center items-center ${isDragging ? "opacity-50" : ""}`}
+      className={`bg-blue-200 p-2 rounded text-center text-xs font-bold h-12 w-24 flex flex-col justify-center items-center ${isDragging ? "opacity-50" : ""}`}
       style={{ transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined }}
     >
       {editable && isEditing ? (
         <input
-          className="text-center font-bold text-sm w-full bg-white rounded"
+          className="text-center font-bold text-xs w-full bg-white rounded"
           value={player.name}
           onChange={(e) => onChange(player.id, e.target.value)}
           onBlur={onBlur}
@@ -224,14 +240,14 @@ function PlayerCard({ player, onDoubleClick, isEditing, onChange, onBlur, editab
   );
 }
 
-function DropZone({ id, player, ...rest }) {
+function DropZone({ id, player, children, ...rest }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
       ref={setNodeRef}
-      className={`h-12 w-28 rounded flex items-center justify-center ${id.split('-')[0] >= 6 ? 'bg-yellow-100' : 'bg-red-200'} ${isOver ? "ring-2 ring-blue-400" : ""}`}
+      className={`h-12 w-24 rounded flex items-center justify-center ${id.split('-')[0] >= 6 ? 'bg-yellow-100' : 'bg-red-200'} ${isOver ? "ring-2 ring-blue-400" : ""}`}
     >
-      {player ? <PlayerCard player={player} editable={false} {...rest} /> : null}
+      {player ? <PlayerCard player={player} editable={false} {...rest} /> : children}
     </div>
   );
 }
@@ -241,7 +257,7 @@ function ListDropZone({ players, ...rest }) {
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col gap-4 max-h-screen overflow-y-auto pr-2 ${isOver ? "ring-2 ring-blue-400" : ""}`}
+      className={`flex flex-col gap-2 max-h-[70vh] overflow-y-auto pr-2 w-full sm:w-32 ${isOver ? "ring-2 ring-blue-400" : ""}`}
     >
       {players.map((player) => (
         <PlayerCard key={player.id} player={player} {...rest} editable={true} />
