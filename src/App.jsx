@@ -54,18 +54,20 @@ function TeamLayout() {
     setActivePlayer(draggedFromField || draggedFromList);
   };
 
-  const handleDragEnd = (event) => {
+  const handleDragEnd = async (event) => {
     const { over, active } = event;
     if (!over) {
       setActivePlayer(null);
       return;
     }
+
     const newField = field.map(row => row.slice());
     for (let r = 0; r < 9; r++) {
       for (let c = 0; c < 3; c++) {
         if (newField[r][c]?.id === active.id) newField[r][c] = null;
       }
     }
+
     let action = null;
     if (over.id === "player-list") {
       if (!players.some(p => p.id === active.id)) {
@@ -86,12 +88,22 @@ function TeamLayout() {
       setField(newField);
       action = { type: "MOVE", id: active.id, row: targetRow, col: targetCol, player: activePlayer };
     }
+
     if (action) {
       const channel = supabase.channel("team-selector-sync");
       channel.send({ type: "broadcast", event: "drag", payload: action })
         .then(() => console.log("Action broadcasted:", action))
         .catch((err) => console.error("Broadcast error:", err));
     }
+
+    try {
+      const { error: saveError } = await supabase.from('layouts').upsert({ name: 'live', data: JSON.stringify(newField) }, { onConflict: 'name' });
+      if (saveError) console.error("Upsert failed:", saveError);
+      else console.log("Live layout saved to Supabase.");
+    } catch (err) {
+      console.error("Error saving live layout:", err);
+    }
+
     setActivePlayer(null);
   };
 
@@ -99,6 +111,7 @@ function TeamLayout() {
     const channel = supabase.channel("team-selector-sync");
     channel.on("broadcast", { event: "drag" }, ({ payload }) => {
       const action = payload;
+      console.log("Broadcast received:", action);
       if (action.type === "RETURN") {
         setPlayers((prev) => [...prev, action.player]);
         setField((prev) => prev.map(row => row.map(p => (p?.id === action.id ? null : p))));
@@ -119,6 +132,22 @@ function TeamLayout() {
     };
 
     fetchLayouts();
+
+    const loadLiveLayout = async () => {
+      const { data, error } = await supabase.from('layouts').select('data').eq('name', 'live').single();
+      if (error) {
+        console.warn("No live layout found or failed to load:", error);
+      } else if (data?.data) {
+        try {
+          const parsed = JSON.parse(data.data);
+          console.log("Loaded live layout:", parsed);
+          setField(parsed);
+        } catch (e) {
+          console.error("Error parsing live layout:", e);
+        }
+      }
+    };
+    loadLiveLayout();
   }, []);
 
   return (
@@ -208,8 +237,7 @@ function PlayerCard({ player, onDoubleClick, isEditing, onChange, onBlur, editab
         if (editable && !isDragging) onDoubleClick(player.id);
       }}
       className={`bg-blue-200 p-2 rounded text-center text-xs font-bold h-12 w-24 flex flex-col justify-center items-center touch-none ${isDragging ? "opacity-50" : ""}`}
-style={{ transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined }}
-
+      style={{ transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined }}
     >
       {editable && isEditing ? (
         <input
@@ -248,7 +276,7 @@ const initialPlayers = [
   { id: '2', number: 2, name: 'RUBY' },
   { id: '4', number: 4, name: 'CHARLOTTE' },
   { id: '13', number: 13, name: 'CHELSEA' },
-  { id: '15', number: 15, name: 'TYLAH' },
+  { id: '17', number: 17, name: 'TYLAH' },
   { id: '7', number: 7, name: 'ELLIE' },
   { id: '38', number: 38, name: 'SIENNA R' }
 ];
