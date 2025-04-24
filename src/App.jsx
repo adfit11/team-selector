@@ -12,19 +12,17 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
 
 const SupabaseContext = createContext(null);
-
 function SupabaseProvider({ children }) {
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
   return <SupabaseContext.Provider value={supabase}>{children}</SupabaseContext.Provider>;
 }
-
 function useSupabase() {
   return useContext(SupabaseContext);
 }
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-100">
       <SupabaseProvider>
         <TeamLayout />
       </SupabaseProvider>
@@ -70,10 +68,12 @@ function TeamLayout() {
 
     let action = null;
     if (over.id === "player-list") {
-      if (!players.some(p => p.id === active.id)) {
-        setPlayers((prev) => [...prev, activePlayer]);
-      }
-      setField(newField);
+      const updatedPlayers = [...players];
+      const isInList = updatedPlayers.some(p => p.id === active.id);
+      const updatedField = newField.map(row => row.map(p => (p?.id === active.id ? null : p)));
+      if (!isInList) updatedPlayers.push(activePlayer);
+      setPlayers(updatedPlayers);
+      setField(updatedField);
       action = { type: "RETURN", id: active.id, player: activePlayer };
     } else {
       const [targetRow, targetCol] = over.id.split("-").map(Number);
@@ -97,7 +97,10 @@ function TeamLayout() {
     }
 
     try {
-      const { error: saveError } = await supabase.from('layouts').upsert({ name: 'live', data: JSON.stringify(newField) }, { onConflict: 'name' });
+      const { error: saveError } = await supabase.from('layouts').upsert(
+        { name: 'live', data: JSON.stringify(newField) },
+        { onConflict: 'name' }
+      );
       if (saveError) console.error("Upsert failed:", saveError);
       else console.log("Live layout saved to Supabase.");
     } catch (err) {
@@ -130,7 +133,6 @@ function TeamLayout() {
       const { data, error } = await supabase.from('layouts').select('name');
       if (!error && data) setSavedLayouts(data.map(d => d.name));
     };
-
     fetchLayouts();
 
     const loadLiveLayout = async () => {
@@ -140,8 +142,8 @@ function TeamLayout() {
       } else if (data?.data) {
         try {
           const parsed = JSON.parse(data.data);
-          console.log("Loaded live layout:", parsed);
           setField(parsed);
+          console.log("Loaded live layout:", parsed);
         } catch (e) {
           console.error("Error parsing live layout:", e);
         }
@@ -276,9 +278,9 @@ const initialPlayers = [
   { id: '2', number: 2, name: 'RUBY' },
   { id: '4', number: 4, name: 'CHARLOTTE' },
   { id: '13', number: 13, name: 'CHELSEA' },
-  { id: '17', number: 17, name: 'TYLAH' },
   { id: '7', number: 7, name: 'ELLIE' },
   { id: '38', number: 38, name: 'SIENNA R' }
 ];
 
 export default App;
+
