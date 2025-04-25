@@ -68,10 +68,12 @@ function TeamLayout() {
 
     let action = null;
     if (over.id === "player-list") {
-      const updatedPlayers = [...players];
-      const isInList = updatedPlayers.some(p => p.id === active.id);
+      if (players.some(p => p.id === active.id)) {
+        setActivePlayer(null);
+        return;
+      }
+      const updatedPlayers = [...players, activePlayer];
       const updatedField = newField.map(row => row.map(p => (p?.id === active.id ? null : p)));
-      if (!isInList) updatedPlayers.push(activePlayer);
       setPlayers(updatedPlayers);
       setField(updatedField);
       action = { type: "RETURN", id: active.id, player: activePlayer };
@@ -217,7 +219,7 @@ function ListDropZone({ players, ...rest }) {
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-row gap-2 overflow-x-auto py-2 ${isOver ? "ring-2 ring-blue-400" : ""}`}
+      className={`flex flex-row gap-2 overflow-x-auto py-2 touch-pan-x ${isOver ? "ring-2 ring-blue-400" : ""}`}
     >
       {players.map((player) => (
         <PlayerCard key={player.id} player={player} {...rest} editable={true} />
@@ -283,4 +285,3 @@ const initialPlayers = [
 ];
 
 export default App;
-
