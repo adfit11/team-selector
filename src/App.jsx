@@ -11,6 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
 
+
 const SupabaseContext = createContext(null);
 function SupabaseProvider({ children }) {
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -68,7 +69,9 @@ function TeamLayout() {
 
     let action = null;
     if (over.id === "player-list") {
-      if (players.some(p => p.id === active.id)) {
+      // Prevent duplication if already in list
+      const isInList = players.some(p => p.id === active.id);
+      if (isInList) {
         setActivePlayer(null);
         return;
       }
@@ -118,7 +121,9 @@ function TeamLayout() {
       const action = payload;
       console.log("Broadcast received:", action);
       if (action.type === "RETURN") {
-        setPlayers((prev) => [...prev, action.player]);
+      setPlayers((prev) =>
+        prev.some(p => p.id === action.player.id) ? prev : [...prev, action.player]
+      );
         setField((prev) => prev.map(row => row.map(p => (p?.id === action.id ? null : p))));
       } else if (action.type === "MOVE") {
         setPlayers((prev) => prev.filter(p => p.id !== action.id));
@@ -146,6 +151,10 @@ function TeamLayout() {
           const parsed = JSON.parse(data.data);
           setField(parsed);
           console.log("Loaded live layout:", parsed);
+
+          const fieldPlayerIds = parsed.flat().filter(p => p).map(p => p.id);
+          setPlayers(prev => prev.filter(p => !fieldPlayerIds.includes(p.id)));
+          console.log("Cleaned players list after loading layout. Players already placed on field removed from list.");
         } catch (e) {
           console.error("Error parsing live layout:", e);
         }
@@ -229,7 +238,7 @@ function ListDropZone({ players, ...rest }) {
 }
 
 function PlayerCard({ player, onDoubleClick, isEditing, onChange, onBlur, editable }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: player.id });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: player.id, activationConstraint: { delay: 250, tolerance: 5 } });
   return (
     <div
       ref={setNodeRef}
