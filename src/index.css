@@ -4,16 +4,16 @@
 @tailwind utilities;
 
 body {
-  @apply bg-gray-100 text-gray-900;
+  @apply bg-blue-100 text-gray-900;
 }
 
-/* Custom scrollbar for player list */
+/* Force always-visible custom scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   height: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(100, 100, 100, 0.6);
+  background: rgba(100, 100, 100, 0.6);
   border-radius: 5px;
 }
 
@@ -21,7 +21,7 @@ body {
   background: transparent;
 }
 
-/* Firefox compatibility */
+/* For Firefox */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(100, 100, 100, 0.6) transparent;

@@ -191,7 +191,7 @@ function TeamLayout() {
           ))}
         </div>
 
-        <div className="overflow-x-auto mt-4">
+        <div className="overflow-x-auto mt-4 custom-scrollbar">
           <div className="flex flex-row gap-2 py-2">
             <ListDropZone
               players={players}
@@ -228,7 +228,7 @@ function ListDropZone({ players, ...rest }) {
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-row gap-2 overflow-x-auto py-2 touch-pan-x ${isOver ? "ring-2 ring-blue-400" : ""}`}
+      className={`flex flex-row gap-2 overflow-x-auto py-2 touch-pan-x custom-scrollbar ${isOver ? "ring-2 ring-blue-400" : ""}`}
     >
       {players.map((player) => (
         <PlayerCard key={player.id} player={player} {...rest} editable={true} />
@@ -238,7 +238,14 @@ function ListDropZone({ players, ...rest }) {
 }
 
 function PlayerCard({ player, onDoubleClick, isEditing, onChange, onBlur, editable }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: player.id, activationConstraint: { distance: 10 } });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  id: player.id,
+  activationConstraint: {
+    delay: 400, // user must hold 400ms before dragging
+    tolerance: 20 // allow tiny wiggle without cancelling
+  }
+});
+
   return (
     <div
       ref={setNodeRef}
