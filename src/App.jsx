@@ -238,7 +238,7 @@ function ListDropZone({ players, ...rest }) {
 }
 
 function PlayerCard({ player, onDoubleClick, isEditing, onChange, onBlur, editable }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: player.id, activationConstraint: { delay: 250, tolerance: 5 } });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: player.id, activationConstraint: { distance: 10 } });
   return (
     <div
       ref={setNodeRef}
